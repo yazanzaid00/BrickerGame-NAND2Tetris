@@ -12,10 +12,9 @@ Watch the gameplay demo here:
 
 
 ## 🚀 How to Run
-1. Visit [NAND2Tetris Web IDE](https://nand2tetris.github.io/web-ide/vm/).
-2. Go to **NAND2Tetris / Jack Compiler**.
-3. Upload this repository's directory.
-4. Click **Run** to start the game.
+1. Visit [NAND2Tetris Web IDE](https://nand2tetris.github.io/web-ide/compiler).
+2. Upload this repository's directory.
+3. Click **Run** to start the game.
 
 ## 📂 File Overview
 - **`Ball.jack`**: Manages ball movement and collisions.
