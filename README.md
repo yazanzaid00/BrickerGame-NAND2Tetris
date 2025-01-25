@@ -13,7 +13,7 @@ Watch the gameplay demo here:
 
 ## 🚀 How to Run
 1. Visit [NAND2Tetris Web IDE](https://nand2tetris.github.io/web-ide/compiler).
-2. Upload this repository's directory.
+2. Upload this repository's `Code` directory.
 3. Click **Run** to start the game.
 
 ## 📂 File Overview
