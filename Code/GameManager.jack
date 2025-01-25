@@ -1,0 +1,655 @@
+/**
+ * GameManager.jack
+ * Orchestrates the Bricker game with bricks, walls, paddle, ball, and scoreboard.
+ *
+ * Key fix:
+ *   - Removed duplicate loops drawing the walls in the constructor.
+ *   - We call drawInitialWalls() exactly once.
+ *   - Also re-enabled the brick creation logic.
+ */
+class GameManager {
+
+    // ---------------------------
+    // Fields
+    // ---------------------------
+
+    // Game objects
+    field Ball        ball;
+    field Paddle      paddle;
+    field LifeCounter lifeCounter;
+
+    // Brick array
+    field Array  bricks;
+    field int    numBricks;
+    field int    numXBricks;
+    field int    numYBricks;
+
+    // For brick positioning
+    field int brickStartX;
+    field int brickStartY;
+    field int brickGap;
+    field int brickWidth;
+    field int brickHeight;
+
+    // Screen dimension
+    field int screenWidth;
+    field int screenHeight;
+
+    // Layout for text row + walls
+    field int textRowHeight;
+    field int textRowsUsed;
+    field int textPanelHeight;
+    field int wallThickness;
+
+    // Playable area boundaries
+    field int leftBound;
+    field int rightBound;
+    field int topBound;
+    field int bottomBound;
+
+    // Basic state
+    field int  score;
+    field boolean gameOver;
+    field boolean gameWon;
+    field int initialLives;
+    field int FACE_TOP;
+
+    // Constants for gameplay
+    field int WAIT_MS;        // e.g. 25 ms
+    field int VICTORY_WAIT_TIME; // e.g. 3000 ms
+    field int WAIT_TIME_MS;   // e.g. 1500 ms
+    field int PADDLE_START_Y; // e.g. 230
+    field int BALL_START_Y;   // e.g. 200
+    field int PADDLE_WIDTH;   // e.g. 50
+    field int PADDLE_HEIGHT;  // e.g. 10
+    field int PADDLE_GAP;     // e.g. 10
+    field int PADDLE_BOTTOM_OFFSET; // e.g. 40
+    field int PADDLE_TOP_OFFSET;   // e.g. 20
+    field int BALL_INITIAL_DX; // e.g. 2
+    field int BALL_INITIAL_DY; // e.g. 2
+    field int BALL_SIZE;       // e.g. 10
+    field int brickHeightOffset; // e.g. 20
+    field String clearString;
+    field String lifeCounterDisplay;
+    field String instructions;
+    field String victoryMessage;
+    field String gameOverMessage;
+    field int PADDLE_SPEED;
+    field boolean PIXEL_ON;
+    field boolean PIXEL_OFF;
+
+    field int BALL_START_X;
+    field char WIN_KEY_LOWER;
+    field char WIN_KEY_UPPER;
+    /**
+     * Constructor:
+     *  1) Clear screen
+     *  2) Print instructions once
+     *  3) Draw thick walls
+     *  4) Create LifeCounter, Paddle, Ball
+     *  5) Setup bricks array
+     */
+    constructor GameManager new() {
+        // Declare all local variables at the top
+        var int i, row, col, index, xPos, yPos;
+        var int brickRegionTop, brickRegionLeft, brickRegionRight, brickRegionBottom;
+        var int regionWidth, regionHeight, totalGapWidth, totalGapHeight;
+        var int computedBrickWidth, computedBrickHeight;
+
+        // 1) Named dimension constants
+        let PIXEL_ON = true;
+        let PIXEL_OFF = false;
+        let screenWidth  = 512;
+        let screenHeight = 256;
+        let clearString = "     ";
+        let instructions = "Arrows=move, 'w'=win | Hearts: ";
+        let lifeCounterDisplay = "";
+        let victoryMessage = "";
+        let gameOverMessage = "";
+        let textRowHeight   = 12;  // 1 text line is ~12 pixels tall
+        let textRowsUsed    = 1;   // using 1 row for instructions
+        let textPanelHeight = (textRowHeight * textRowsUsed); // e.g. 12
+        let wallThickness   = 10;
+        let initialLives    = 3;
+        // 2) Define playable region
+        let topBound    = ((textPanelHeight + wallThickness) + 1); // 12 + 10 +1 =23
+        let bottomBound = (screenHeight - wallThickness - 1);                      //245
+        let leftBound   = wallThickness;                           //10
+        let rightBound  = (screenWidth - wallThickness - 1);       //501
+
+        let score    = 0;
+        let gameWon = false;
+        let gameOver = false;
+        let WIN_KEY_LOWER = 119; // 'w'
+        let WIN_KEY_UPPER = 87;  // 'W'
+
+        // Additional constants for the main loop
+        let WAIT_MS        = 25;
+        let VICTORY_WAIT_TIME = 3000;
+        let WAIT_TIME_MS   = 1500;
+        let PADDLE_BOTTOM_OFFSET = 30;
+        let PADDLE_TOP_OFFSET    = 20;
+
+        let PADDLE_START_Y = (bottomBound - PADDLE_BOTTOM_OFFSET); // Positioned 40 pixels above bottom
+        let BALL_START_Y   = (PADDLE_START_Y - PADDLE_TOP_OFFSET); // Positioned 20 pixels above the paddle
+        let FACE_TOP      = 4;
+
+        let PADDLE_WIDTH  = 40;
+        let PADDLE_HEIGHT = 8;
+        let PADDLE_GAP    = 10;
+        let BALL_INITIAL_DX = 2;
+        let BALL_INITIAL_DY = 2;
+        let BALL_SIZE       = 5;
+        let brickHeightOffset = 10;
+        let PADDLE_SPEED = 4;
+        // 3) Clear screen & print instructions
+        do Screen.clearScreen();
+        do Output.moveCursor(0, 0);
+        do Output.printString(instructions);
+
+        // 4) Draw the top border + left/right walls once
+        do drawInitialWalls();
+
+        // 5) Create lifeCounter, paddle, ball
+        let lifeCounter = LifeCounter.new(initialLives);
+        // Paddle is positioned closer to walls with the same brickGap
+        let paddle = Paddle.new(
+            (leftBound + PADDLE_GAP),                  // 10 pixels from left wall (brickGap)
+            PADDLE_START_Y,                    // Y position closer to bottom
+            PADDLE_WIDTH,                      // Paddle width
+            PADDLE_HEIGHT,                      // Paddle height
+            PADDLE_SPEED
+        );
+        let BALL_START_X = ((leftBound + rightBound) / 2); // Centered horizontally
+        // Ball is centered horizontally and positioned above the paddle
+        let ball = Ball.new(
+            BALL_START_X,    // Centered horizontally
+            BALL_START_Y,                       // Positioned above the paddle
+            BALL_INITIAL_DX,                    // Initial DX
+            BALL_INITIAL_DY,                    // Initial DY
+            BALL_SIZE                           // Ball size
+        );
+
+        // 6) Setup bricks
+        let numXBricks  = 5;  // Number of brick columns
+        let numYBricks  = 3;  // Number of brick rows (increased for bigger bricks)
+        let brickGap    = 5; // Gap between bricks in pixels
+
+        // 7) Define brick region with equal margins on left and right
+        let brickRegionTop    = (topBound + brickGap);             // 10 pixels below topBound
+        let brickRegionLeft   = (leftBound + brickGap);            // 10 pixels from leftBound
+        let brickRegionRight  = (rightBound - brickGap);           // 10 pixels from rightBound
+        let brickRegionBottom = (brickRegionTop + (numYBricks * (brickGap + brickHeightOffset))); // Use brickHeight instead of magic number
+
+        // 8) Calculate brick region dimensions
+        let regionWidth  = (brickRegionRight - brickRegionLeft);   // Total width available for bricks
+        let regionHeight = (brickRegionBottom - brickRegionTop);   // Total height available for bricks
+
+        // 9) Calculate total gaps
+        let totalGapWidth  = ((numXBricks - 1) * brickGap);
+        let totalGapHeight = ((numYBricks - 1) * brickGap);
+
+        // 10) Compute brick dimensions using integer division
+        let computedBrickWidth  = ((regionWidth - totalGapWidth) / numXBricks);
+        let computedBrickHeight = ((regionHeight - totalGapHeight) / numYBricks);
+
+
+        // 12) Create bricks array
+        let numBricks = (numXBricks * numYBricks);
+        let bricks    = Array.new(numBricks);
+
+        // 13) Initialize bricks in row-major order
+        let index = 0;
+        let row   = 0;
+        while ((row < numYBricks)) {
+            let col = 0;
+            while ((col < numXBricks)) {
+                // Calculate brick positions with added parentheses
+                let xPos = (brickRegionLeft + (col * (computedBrickWidth + brickGap)));
+                let yPos = (brickRegionTop  + (row * (computedBrickHeight + brickGap)));
+                let bricks[index] = Brick.new(xPos, yPos, computedBrickWidth, computedBrickHeight);
+                let index = (index + 1);
+                let col   = (col + 1);
+            }
+            let row = (row + 1);
+        }
+        return this;
+    }
+
+    /**
+     * Helper that draws top horizontal border plus left/right walls
+     * exactly once in the constructor.
+     */
+    method void drawInitialWalls() {
+        // Draw top border
+        do drawTopWall();
+        // Draw left wall
+        do drawLeftWall();
+        // Draw right wall
+        do drawRightWall();
+        return;
+    }
+
+    /** Cleanup => Dispose bricks, then paddle, ball, lifeCounter. */
+    // TODO: check later with karam
+    method void dispose() {
+        var int i;
+        var Brick b;
+
+        // Dispose bricks
+        let i = 0;
+        while (i < numBricks) {
+            let b = bricks[i];
+            if (~(b = null)) {
+                do b.dispose();
+            }
+            let i = i + 1;
+        }
+        do bricks.dispose();
+
+        // Dispose others
+        do paddle.dispose();
+        do ball.dispose();
+        do lifeCounter.dispose();
+        do clearString.dispose();
+        do lifeCounterDisplay.dispose();
+        do instructions.dispose();
+        do gameOverMessage.dispose();
+        do victoryMessage.dispose();
+
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    /**
+     * Main game loop
+     *  - check keys => if 'w', gameOver
+     *  - move paddle, ball
+     *  - detect collisions
+     *  - scoreboard
+     *  - wait
+     */
+    method void runGame() {
+        var char key;
+        while (~gameOver & ~gameWon) {
+            let key = Keyboard.keyPressed();
+            // if user pressed 'w' => lose or immediate exit:
+            if ((key = WIN_KEY_LOWER) | (key = WIN_KEY_UPPER)) {
+                let gameWon = true;
+            }
+
+            // Paddle + ball
+            do paddle.updateMovement(leftBound, rightBound);
+            do ball.move();
+
+            // Collisions
+            do detectWallCollisions();
+            do handleCollisions();
+
+            // scoreboard
+            do refreshScoreboard();
+
+            // Wait
+            do Sys.wait(WAIT_MS);
+        }
+
+        // After we exit the loop, check if gameWon or gameOver:
+        if (gameWon) {
+            do finalizeVictory();
+        } else {
+            do finalizeGame(); // or finalizeLoss
+        }
+        return;
+    }
+
+    /** If ball overwrote walls, restore them. */
+    /* Special behavior for handling ball bounce when colliding with walls */
+    //TODO: try to utilize ball bounce
+    method void detectWallCollisions() {
+        var int bL, bR, bT, bB;
+        let bL = ball.getLeft();
+        let bR = ball.getRight();
+        let bT = ball.getTop();
+        let bB = ball.getBottom();
+
+        // left
+        if (bL < (leftBound + 1)) {
+            do ball.setX(leftBound + 1);
+            do ball.setDX(-(ball.getDX()));
+            do drawLeftWall();
+        }
+        // right
+        if (bR > (rightBound - 1)) {
+            do ball.setX(rightBound - ball.getSize() - 1);
+            do ball.setDX(-(ball.getDX()));
+            do drawRightWall();
+        }
+        // top
+        if (bT < (topBound + 1)) {
+            do ball.setY(topBound + 1);
+            do ball.setDY(-(ball.getDY()));
+            do drawTopWall();
+        }
+        return;
+    }
+
+
+    /**
+     * handleCollisions => bricks + paddle + losing
+     */
+    method void handleCollisions() {
+        var int bL, bR, bT, bB;
+        let bL = ball.getLeft();
+        let bR = ball.getRight();
+        let bT = ball.getTop();
+        let bB = ball.getBottom();
+
+        // Brick collisions
+        do checkBrickCollisions(bL, bR, bT, bB);
+
+        // If ball is below paddle, or If ball is below bottom => lose life
+        if (bB > (paddle.getY() + paddle.getHeight() + wallThickness) | (bB > (bottomBound + wallThickness))) {
+            do lifeCounter.loseLife();
+            do ball.resetPosition(BALL_START_X, BALL_START_Y);
+        }
+
+        // If ball hits top of paddle while moving down => bounce
+        if ((paddle.detectCollision(bL, bR, bT, bB) = true) & (ball.getDY() > 0)) {
+            do paddle.eraseSelf();
+            do ball.bounce(FACE_TOP, paddle.getLeft(), paddle.getY(),
+                           paddle.getWidth(), paddle.getHeight());
+            do paddle.drawSelf();
+        }
+
+        // if out of lives => gameOver
+        if (lifeCounter.getCurrentLives() < 1) {
+            let gameOver = true;
+        }
+        return;
+    }
+
+    /**
+     * Checks collisions with the bricks array:
+     *  - If brick is not destroyed, check collision => bounce => increment score if hit
+     */
+    method void checkBrickCollisions(int bL, int bR, int bT, int bB) {
+        var int i, face;
+        var Brick bRef;
+
+        let i = 0;
+        while (i < numBricks) {
+            let bRef = bricks[i];
+            if (~(bRef = null)) {
+                if (~(bRef.isDestroyed())) {
+                    let face = bRef.checkCollision(bL, bR, bT, bB);
+                    if (face > 0) {
+                        // bounce
+                        do ball.bounce(face, bRef.getX(), bRef.getY(),
+                                       bRef.getWidth(), bRef.getHeight());
+
+                        // increment score
+                        let score = score + 1;
+
+                        // If we've destroyed them all => you win
+                        if (score > (numBricks - 1)) {
+                            let gameWon = true;
+                        }
+
+                    } else {
+                        do bRef.drawSelf();
+                    }
+                }
+            }
+            let i = i + 1;
+        }
+        return;
+    }
+
+    // ------------------------------------------------------------------
+    // scoreboard => Overwrite old text each time so leftover stars won't remain
+    // ------------------------------------------------------------------
+    method void refreshScoreboard() {
+        // Move cursor after "Arrows=move, 'w'=win | Hearts: "
+        // That's ~29 chars in, so let's do col=29
+        do Output.moveCursor(0, 30);
+
+        // Overwrite old hearts by printing spaces
+        do Output.printString(clearString); // enough to clear up to 5 hearts
+        // Move cursor back
+        do Output.moveCursor(0, 30);
+
+        do lifeCounterDisplay.dispose();
+        // Now print updated hearts from LifeCounter
+        let lifeCounterDisplay = lifeCounter.getDisplayString();
+        do Output.printString(lifeCounterDisplay);
+        return;
+    }
+
+    // ------------------------------------------------------------------
+    // finalize => show game over
+    // ------------------------------------------------------------------
+   method void finalizeVictory() {
+       // Clear part of screen
+       do Screen.setColor(PIXEL_OFF);
+       do Screen.drawRectangle(120, 90, 400, 120);
+
+       do Output.moveCursor(10,24);
+       do victoryMessage.dispose();
+       let victoryMessage = "YOU WIN!";
+       do Output.printString(victoryMessage);
+       do Sys.wait(VICTORY_WAIT_TIME);
+       return;
+   }
+
+   method void finalizeGame() {
+       // Clear the screen
+       do Screen.clearScreen();
+       // This is the losing scenario
+       do Screen.setColor(PIXEL_OFF);
+       do Screen.drawRectangle(120, 90, 400, 120);
+
+       do Output.moveCursor(10,24);
+       do gameOverMessage.dispose();
+       let gameOverMessage = "GAME OVER!";
+       do Output.printString(gameOverMessage);
+       do Sys.wait(WAIT_TIME_MS);
+       return;
+   }
+
+    // ------------------------------------------------------------------
+    // Re-draw walls if ball overwrote them
+    // ------------------------------------------------------------------
+    method void drawTopWall() {
+        do Screen.setColor(PIXEL_ON);
+        do Screen.drawRectangle(0, textPanelHeight, screenWidth - 1, textPanelHeight + wallThickness);
+        return;
+    }
+
+    method void drawLeftWall() {
+        do Screen.setColor(PIXEL_ON);
+        do Screen.drawRectangle(0, textPanelHeight, wallThickness, screenHeight - 1);
+        return;
+    }
+
+    method void drawRightWall() {
+        do Screen.setColor(PIXEL_ON);
+        do Screen.drawRectangle(rightBound, textPanelHeight, rightBound + wallThickness, screenHeight - 1);
+        return;
+    }
+
+    // Getter methods
+    method int getScreenWidth() {
+        return screenWidth;
+    }
+
+    method int getScreenHeight() {
+        return screenHeight;
+    }
+
+    method int getTextRowHeight() {
+        return textRowHeight;
+    }
+
+    method int getTextRowsUsed() {
+        return textRowsUsed;
+    }
+
+    method int getTextPanelHeight() {
+        return textPanelHeight;
+    }
+
+    method int getWallThickness() {
+        return wallThickness;
+    }
+
+    method int getLeftBound() {
+        return leftBound;
+    }
+
+    method int getRightBound() {
+        return rightBound;
+    }
+
+    method int getTopBound() {
+        return topBound;
+    }
+
+    method int getBottomBound() {
+        return bottomBound;
+    }
+
+    method int getScore() {
+        return score;
+    }
+
+    method boolean getGameOver() {
+        return gameOver;
+    }
+
+    method boolean getGameWon() {
+        return gameWon;
+    }
+
+    method int getInitialLives() {
+        return initialLives;
+    }
+
+    method int getBrickHeightOffset() {
+        return brickHeightOffset;
+    }
+
+    method String getLifeCounterDisplay() {
+        return lifeCounterDisplay;
+    }
+
+    method String getInstructions() {
+        return instructions;
+    }
+
+    method String getVictoryMessage() {
+        return victoryMessage;
+    }
+
+    method String getGameOverMessage() {
+        return gameOverMessage;
+    }
+
+    // Setter methods
+    method void setScreenWidth(int val) {
+        let screenWidth = val;
+        return;
+    }
+
+    method void setScreenHeight(int val) {
+        let screenHeight = val;
+        return;
+    }
+
+    method void setTextRowHeight(int val) {
+        let textRowHeight = val;
+        return;
+    }
+
+    method void setTextRowsUsed(int val) {
+        let textRowsUsed = val;
+        return;
+    }
+
+    method void setTextPanelHeight(int val) {
+        let textPanelHeight = val;
+        return;
+    }
+
+    method void setWallThickness(int val) {
+        let wallThickness = val;
+        return;
+    }
+
+    method void setLeftBound(int val) {
+        let leftBound = val;
+        return;
+    }
+
+    method void setRightBound(int val) {
+        let rightBound = val;
+        return;
+    }
+
+    method void setTopBound(int val) {
+        let topBound = val;
+        return;
+    }
+
+    method void setBottomBound(int val) {
+        let bottomBound = val;
+        return;
+    }
+
+    method void setScore(int val) {
+        let score = val;
+        return;
+    }
+
+    method void setGameOver(boolean val) {
+        let gameOver = val;
+        return;
+    }
+
+    method void setGameWon(boolean val) {
+        let gameWon = val;
+        return;
+    }
+
+    method void setInitialLives(int val) {
+        let initialLives = val;
+        return;
+    }
+
+    method void setBrickHeightOffset(int val) {
+        let brickHeightOffset = val;
+        return;
+    }
+
+
+    method void setLifeCounterDisplay(String val) {
+        let lifeCounterDisplay = val;
+        return;
+    }
+
+    method void setInstructions(String val) {
+        let instructions = val;
+        return;
+    }
+
+    method void setVictoryMessage(String val) {
+        let victoryMessage = val;
+        return;
+    }
+
+    method void setGameOverMessage(String val) {
+        let gameOverMessage = val;
+        return;
+    }
+
+
+}

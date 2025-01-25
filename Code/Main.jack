@@ -1,0 +1,13 @@
+/**
+ * Main.jack
+ * Entry point. Creates a GameManager and runs it.
+ */
+class Main {
+    function void main() {
+        var GameManager gameManager;
+        let gameManager = GameManager.new();
+        do gameManager.runGame();
+        do gameManager.dispose();
+        return;
+    }
+}

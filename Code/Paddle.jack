@@ -1,0 +1,177 @@
+/**
+ * Paddle.jack
+ * Handles user-controlled paddle logic, including its own movement (arrow keys).
+ *
+ * Changes:
+ * - Introduced a paddleSpeed variable to replace magic "4".
+ */
+class Paddle {
+
+    field int x, y;          // top-left
+    field int width, height;
+    field int movement;      // 0 => stop, 1 => left, 2 => right
+
+    // Additional field for speed
+    field int paddleSpeed;
+    field char leftArrowKey, rightArrowKey;
+    field int moveLeft, moveRight, stopMovement;
+
+    // Screen boundaries
+    field int SCREEN_WIDTH;
+    field int SCREEN_HEIGHT;
+
+    field boolean PIXEL_ON;
+    field boolean PIXEL_OFF;
+    /**
+     * Creates a paddle at (px, py) with dimensions pWidth, pHeight.
+     */
+    constructor Paddle new(int px, int py, int pWidth, int pHeight, int pSpeed) {
+        let x = px;
+        let y = py;
+        let width = pWidth;
+        let height = pHeight;
+        let paddleSpeed = pSpeed; // Replaces the magic "4" from earlier
+        let leftArrowKey = 130;
+        let rightArrowKey = 132;
+        let moveLeft = 1;
+        let moveRight = 2;
+        let stopMovement = 0;
+        let movement = stopMovement;    // STOP
+        let SCREEN_WIDTH = 512;
+        let SCREEN_HEIGHT = 256;
+        let PIXEL_ON = true;
+        let PIXEL_OFF = false;
+        do drawSelf();
+        return this;
+    }
+
+    /** Dispose object. */
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    /**
+     * Move the paddle based on arrow inputs.
+     * This method reads keyboard each frame, updating movement direction
+     * and moving the paddle.
+     */
+    method void updateMovement(int leftBound, int rightBound) {
+        var char key;
+        let key = Keyboard.keyPressed();
+
+        // left arrow => 130, right arrow => 132
+        if (key = leftArrowKey) {
+            let movement = moveLeft;
+        } else {
+            if (key = rightArrowKey) {
+            let movement = moveRight;
+            } else {
+                let movement = stopMovement;
+            }
+        }
+
+        // Move the paddle
+        do eraseSelf();
+        if (movement = moveLeft) {  // going left
+            let x = x - paddleSpeed;
+        }
+        if (movement = moveRight) {  // going right
+            let x = x + paddleSpeed;
+        }
+
+        // Use Math.max to keep x >= leftBound + 1
+        let x = Math.max(x, (leftBound + 1));
+
+        // Then use Math.min to keep x + width <= rightBound - 1
+        // i.e. x <= (rightBound - width - 1)
+        let x = Math.min(x, (rightBound - width - 1));
+
+        do drawSelf();
+        return;
+    }
+
+
+    /** Render the paddle. */
+    method void drawSelf() {
+        if ((~(x < 0)) & (~((x + width) > SCREEN_WIDTH)) & (~(y < 0)) & (~((y + height) > SCREEN_HEIGHT))) {
+            do Screen.setColor(PIXEL_ON);
+            do Screen.drawRectangle(x, y, x + width, y + height);
+        }
+        return;
+    }
+
+    /** Erase the paddle region by drawing white. */
+    method void eraseSelf() {
+        if ((~(x < 0)) & (~((x + width) > SCREEN_WIDTH)) & (~(y < 0)) & (~((y + height) > SCREEN_HEIGHT))) {
+            do Screen.setColor(PIXEL_OFF);
+            do Screen.drawRectangle(x, y, x + width, y + height);
+        }
+        return;
+    }
+
+    /**
+     * Check collision with ball bounding box.
+     * Return true if ball horizontally overlaps and the ball's bottom
+     * is near the paddle's top region.
+     */
+    method boolean detectCollision(int ballLeft, int ballRight, int ballTop, int ballBottom) {
+        var int cushion;
+        let cushion = 2;
+        if (((ballRight > (x - cushion)) & (ballLeft < (x + width + cushion))) &
+            ((ballBottom > (y - cushion)) & (ballTop < (y + height + cushion)))) {
+            return true;
+        }
+        return false;
+    }
+
+    // Accessors
+    method int getY(){
+        return y;
+      }
+    method int getHeight(){
+        return height;
+      }
+    method int getWidth(){
+        return width;
+      }
+    method int getLeft(){
+        return x;
+      }
+    method int getRight(){
+        return x + width;
+      }
+
+    method void setX(int val){
+        do eraseSelf();
+        let x = val;
+        do drawSelf();
+        return;
+      }
+    method void setY(int val){
+         do eraseSelf();
+         let y = val;
+         do drawSelf();
+         return;
+      }
+    method void setWidth(int val){
+         let width = val;
+         return;
+      }
+    method void setHeight(int val){
+         let height = val;
+         return;
+      }
+
+    method void setPaddleSpeed(int val){
+         let paddleSpeed = val;
+         return;
+      }
+    /** Manually set movement if needed (0 => stop, 1 => left, 2 => right). */
+    method void setMovement(int dir) {
+        let movement = dir;
+        return;
+    }
+
+
+}

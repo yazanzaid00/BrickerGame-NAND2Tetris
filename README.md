@@ -9,7 +9,7 @@ This repository hosts the **Bricker game**, developed in the **Jack programming 
 
 ## 🎮 Demo
 Watch the gameplay demo here: 
-
+![Bricker Game Demo](./Media/brickerGame.gif)
 
 ## 🚀 How to Run
 1. Visit [NAND2Tetris Web IDE](https://nand2tetris.github.io/web-ide/compiler).

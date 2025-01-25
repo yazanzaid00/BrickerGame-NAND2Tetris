@@ -1,0 +1,97 @@
+/**
+ * LifeCounter.jack
+ * Tracks current & max lives, building a hearts-string for display.
+ */
+class LifeCounter {
+
+    field int currentLives;  // current # of lives
+    field String displayStr; // reused for storing hearts or numeric text
+    field int heartChar; // ASCII value for '*'
+    field int maxStringLength; // max length of displayStr
+    field int ERROR_NO_LIVES_LEFT;
+    constructor LifeCounter new(int initLives) {
+        let currentLives = initLives;
+        let heartChar    = 42; // ASCII value for '*'
+        let maxStringLength = 16; // max length of displayStr
+        // Create a reusable string for display
+        let displayStr = String.new(maxStringLength);
+        let ERROR_NO_LIVES_LEFT = 7; // Error code 7: Attempted to lose
+
+        // Build the initial display
+        do updateDisplay();
+        return this;
+    }
+
+    method void dispose() {
+        do displayStr.dispose();
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    /** Subtract a life if we have any left. Then rebuild display. */
+    method void loseLife() {
+        if (currentLives > 0) {
+            let currentLives = currentLives - 1;
+        }else {
+                 do Sys.error(ERROR_NO_LIVES_LEFT); // Error code 7: Attempted to lose life when none are left
+         }
+        do updateDisplay();
+        return;
+    }
+
+    method int getCurrentLives() {
+        return currentLives;
+    }
+
+    /**
+     * Build the hearts string. For each currentLife, append '*'.
+     * If you prefer numeric display, do: displayStr.setInt(currentLives).
+     */
+    method void updateDisplay() {
+        var int i;
+        let i = 0;
+
+        // 1) Clear displayStr:
+        do displayStr.setInt(0);     // sets it to "0"
+        do displayStr.eraseLastChar(); // remove that "0"
+
+        // 2) For each life, append '*'
+        while (i < currentLives) {
+            // ASCII 42 = '*'. no hearts because the Jack is limited to ASCII
+            do displayStr.appendChar(heartChar);
+            let i = i + 1;
+        }
+        return;
+    }
+
+    /** Return the hearts string for printing. */
+    method String getDisplayString() {
+        return displayStr;
+    }
+
+    /** Set the current number of lives. */
+    method void setCurrentLives(int val) {
+        let currentLives = val;
+        do updateDisplay();
+        return;
+    }
+
+    /** Set the display string. */
+    method void setDisplayStr(String val) {
+        let displayStr = val;
+        return;
+    }
+
+    /** Set the heart character ASCII value. */
+    method void setHeartChar(int val) {
+        let heartChar = val;
+        return;
+    }
+
+    /** Set the maximum string length. */
+    method void setMaxStringLength(int val) {
+        let maxStringLength = val;
+        return;
+    }
+
+}

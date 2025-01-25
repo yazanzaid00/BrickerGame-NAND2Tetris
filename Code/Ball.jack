@@ -1,0 +1,205 @@
+/**
+ * Ball.jack
+ * Represents the ball in the Bricker game.
+ * Handles drawing, movement, and collision responses.
+ */
+class Ball {
+    // Screen settings constants
+    field int SCREEN_WIDTH;
+    field int SCREEN_HEIGHT;
+    field boolean PIXEL_ON;
+    field boolean PIXEL_OFF;
+
+    // Collision face constants
+    field int FACE_LEFT;
+    field int FACE_RIGHT;
+    field int FACE_BOTTOM;
+    field int FACE_TOP;
+    field int FACE_OVERLAP;
+
+    // Reset counter constant
+    field int RESET_COUNTER_MAX;
+
+    field int x, y;         // Top-left corner position
+    field int size;         // Size of the ball (width and height)
+    field int dx, dy;       // Velocity components in x and y directions
+    field int initialVelX, initialVelY; // Initial velocities for reset
+    field int resetCounter; // Counter to cycle ball direction upon reset
+    field int EXTERNAL_CUSHION;
+
+    /**
+     * Constructs a new Ball object.
+     * @param startX Initial x-coordinate
+     * @param startY Initial y-coordinate
+     * @param initDX Initial velocity in x-direction
+     * @param initDY Initial velocity in y-direction
+     * @param ballSize Size of the ball
+     */
+    constructor Ball new(int startX, int startY,
+                         int initDX, int initDY,
+                         int ballSize) {
+        let SCREEN_WIDTH = 512;
+        let SCREEN_HEIGHT = 256;
+        let FACE_LEFT     = 1;
+        let FACE_RIGHT    = 2;
+        let FACE_BOTTOM   = 3;
+        let FACE_TOP      = 4;
+        let FACE_OVERLAP  = 5;
+        let RESET_COUNTER_MAX = 4;
+        let PIXEL_ON = true;
+        let PIXEL_OFF = false;
+        let EXTERNAL_CUSHION = 1;
+
+        let x = startX;
+        let y = startY;
+        let size = ballSize;
+
+        let dx = initDX;
+        let dy = initDY;
+
+        let initialVelX = initDX;
+        let initialVelY = initDY;
+        let resetCounter = 0; // Initialize reset counter
+
+        do drawSelf();
+        return this;
+    }
+
+    /** Deallocates the Ball object's memory. */
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    /** Moves the ball by its current velocity. */
+    method void move() {
+        do eraseSelf();
+        let x = x + dx;
+        let y = y + dy;
+        do drawSelf();
+        return;
+    }
+
+    /**
+     * Handles the ball's response upon collision.
+     * Inverts velocity based on the collision face and repositions the ball.
+     *
+     * face The side of collision:
+     *             FACE_LEFT = Left, FACE_RIGHT = Right, FACE_BOTTOM = Bottom, FACE_TOP = Top, 5 = FACE_OVERLAP
+     */
+    method void bounce(int face, int objX, int objY, int objW, int objH) {
+        do eraseSelf();
+
+        if (face = FACE_LEFT) { // Left side collision
+            let dx = -dx;
+            let x = objX - size - EXTERNAL_CUSHION; // Adding cushion
+        } else {
+            if (face = FACE_RIGHT) { // Right side collision
+                let dx = -dx;
+                let x = objX + objW + EXTERNAL_CUSHION; // Adding cushion
+            } else {
+                if (face = FACE_BOTTOM) { // Bottom side collision
+                    let dy = -dy;
+                    let y = objY + objH + EXTERNAL_CUSHION; // Adding cushion
+                } else {
+                    if (face = FACE_TOP) { // Top side collision
+                        let dy = -dy;
+                        let y = objY - size - EXTERNAL_CUSHION; // Adding cushion
+                    } else {
+                        // Unexpected collision face
+                        do Sys.error(FACE_OVERLAP); // Error code 5: Invalid collision face
+                    }
+                }
+            }
+        }
+
+        do drawSelf();
+        return;
+    }
+
+    /**
+     * Resets the ball's position to the center and cycles its initial direction.
+     * Adds a cushion to prevent immediate collision upon reset.
+     *
+     * @param newX New x-coordinate for the ball
+     * @param newY New y-coordinate for the ball
+     */
+    method void resetPosition(int newX, int newY) {
+        do eraseSelf();
+        let x = newX;
+        let y = newY;
+
+        let resetCounter = resetCounter + 1;
+        if (~(resetCounter < RESET_COUNTER_MAX)) {
+            let resetCounter = 0;
+        }
+
+        // Cycle through four possible initial directions
+        if (resetCounter = 0) {
+            let dx = initialVelX;
+            let dy = -initialVelY;
+        }
+        if (resetCounter = 1) {
+            let dx = -initialVelX;
+            let dy = -initialVelY;
+        }
+        if (resetCounter = 2) {
+            let dx = -initialVelX;
+            let dy = initialVelY;
+        }
+        if (resetCounter = 3) {
+            let dx = initialVelX;
+            let dy = initialVelY;
+        }
+
+        do drawSelf();
+        return;
+    }
+
+    /** Draws the ball as a filled rectangle on the screen. */
+    method void drawSelf() {
+        // Boundary check to ensure the ball stays within the screen
+        if ((~(x < 0)) & (~((x + size) > SCREEN_WIDTH)) &
+            (~(y < 0)) & (~((y + size) > SCREEN_HEIGHT))) {
+            do Screen.setColor(PIXEL_ON);
+            do Screen.drawRectangle(x, y, x + size, y + size);
+        }
+        return;
+    }
+
+    /** Erases the ball by drawing a filled rectangle in the background color. */
+    method void eraseSelf() {
+        if ((~(x < 0)) & (~((x + size) > SCREEN_WIDTH)) &
+            (~(y < 0)) & (~((y + size) > SCREEN_HEIGHT))) {
+            do Screen.setColor(PIXEL_OFF);
+            do Screen.drawRectangle(x, y, x + size, y + size);
+        }
+        return;
+    }
+
+    // Accessor methods
+    method int getLeft()   { return x; }
+    method int getRight()  { return x + size; }
+    method int getTop()    { return y; }
+    method int getBottom() { return y + size; }
+    method int getSize()   { return size; }
+    method int getDX()     { return dx; }
+    method int getDY()     { return dy; }
+
+    method void setDX(int val) { let dx = val; return; }
+    method void setDY(int val) { let dy = val; return; }
+
+    method void setX(int val) {
+        do eraseSelf();
+        let x = val;
+        do drawSelf();
+        return;
+    }
+
+    method void setY(int val) {
+        do eraseSelf();
+        let y = val;
+        do drawSelf();
+        return;
+    }
+}

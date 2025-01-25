@@ -1,0 +1,204 @@
+/**
+ * Brick.jack
+ * Represents a brick in the Bricker game.
+ * Handles drawing, erasing, and collision detection.
+ */
+class Brick {
+    // Screen boundaries
+    field int SCREEN_WIDTH;
+    field int SCREEN_HEIGHT;
+
+    field int FACE_LEFT;
+    field int FACE_RIGHT;
+    field int FACE_BOTTOM;
+    field int FACE_TOP;
+
+    field int EXTERNAL_CUSHION;
+
+    field int x, y;           // Top-left corner position
+    field int width, height;  // Dimensions of the brick
+    field boolean destroyed;  // Indicates if the brick is destroyed
+
+    /**
+     * Constructs a new Brick object.
+     * @param bx Initial x-coordinate
+     * @param by Initial y-coordinate
+     * @param w Width of the brick
+     * @param h Height of the brick
+     */
+    constructor Brick new(int bx, int by, int w, int h) {
+        let SCREEN_WIDTH = 512;
+        let SCREEN_HEIGHT = 256;
+        let FACE_LEFT = 1;
+        let FACE_RIGHT = 2;
+        let FACE_BOTTOM = 3;
+        let FACE_TOP = 4;
+        let x = bx;
+        let y = by;
+        let width = w;
+        let height = h;
+        let destroyed = false;
+        let EXTERNAL_CUSHION = 1;
+
+        do drawSelf();
+        return this;
+    }
+
+    /** Deallocates the Brick object's memory. */
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    /** Draws the brick as a filled rectangle on the screen. */
+    method void drawSelf() {
+        if (~destroyed) {
+            if ((~(x < 0)) & (~((x + width) > SCREEN_WIDTH)) &
+                (~(y < 0)) & (~((y + height) > SCREEN_HEIGHT))) {
+                do Screen.setColor(true);
+                do Screen.drawRectangle(x, y, x + width, y + height);
+            }
+        }
+        return;
+    }
+
+    /** Erases the brick by drawing a filled rectangle in the background color. */
+    method void eraseSelf() {
+        if (~destroyed) { // Only erase if not already destroyed
+            if ((~(x < 0)) & (~((x + width) > SCREEN_WIDTH)) &
+                (~(y < 0)) & (~((y + height) > SCREEN_HEIGHT))) {
+                do Screen.setColor(false);
+                do Screen.drawRectangle(x, y, x + width, y + height);
+            }
+        }
+        return;
+    }
+
+    /** Marks the brick as destroyed and erases it from the screen. */
+    method void destroy() {
+        if (~destroyed) {
+            do eraseSelf();
+            let destroyed = true;
+        }
+        return;
+    }
+
+    /** Checks if the brick is destroyed. */
+    method boolean isDestroyed() {
+        return destroyed;
+    }
+
+    /**
+     * Determines the side of collision based on the ball's position.
+     * @param ballLeft The left x-coordinate of the ball
+     * @param ballRight The right x-coordinate of the ball
+     * @param ballTop The top y-coordinate of the ball
+     * @param ballBottom The bottom y-coordinate of the ball
+     * @return An integer representing the collision face:
+     *         1 = Left, 2 = Right, 3 = Bottom, 4 = Top, 0 = No collision
+     */
+    method int checkCollision(int ballLeft, int ballRight, int ballTop, int ballBottom) {
+        var int face;
+        var int internalCushion;
+        let face = 0;
+
+        // If brick is already destroyed or no overlap, no collision
+        if (destroyed) {
+            return 0;
+        }
+        if ((ballRight < x) | (ballLeft > (x + width))) {
+            return 0;
+        }
+        if ((ballBottom < y) | (ballTop > (y + height))) {
+            return 0;
+        }
+
+        // Define a pixel internalCushion to prevent overlap
+
+         let internalCushion = Math.max(1,  ((Math.min(width, height)) / 2));
+        // Determine collision face based on ball's position relative to the brick
+        // Face numbering:
+        // 1 = Left, 2 = Right, 3 = Bottom, 4 = Top
+
+        // Top collision: Ball hits the top edge of the brick
+        // Cushion is inside the brick to prevent overlap
+        if ((ballBottom > y - EXTERNAL_CUSHION) & (ballBottom < (y + internalCushion))) {
+            let face = FACE_TOP;
+        }
+        else {
+            // Bottom collision: Ball hits the bottom edge of the brick
+            if ((ballTop > (y + height - internalCushion)) & (ballTop < (y + height + EXTERNAL_CUSHION))) {
+                let face = FACE_BOTTOM;
+            }
+            else {
+                // Left collision: Ball hits the left edge of the brick
+                if ((ballRight > x - EXTERNAL_CUSHION) & (ballRight < (x + internalCushion))) { // Equivalent to <= x + internalCushion
+                    let face = FACE_LEFT;
+                }
+                else {
+                    // Right collision: Ball hits the right edge of the brick
+                    if ((ballLeft > (x + width - internalCushion)) & (ballLeft < (x + width + EXTERNAL_CUSHION))) {
+                        let face = FACE_RIGHT;
+                    }
+                    else {
+                        // No specific side collision detected; could be corner or minimal overlap
+                        // To maintain logic consistency, treat as no collision
+                        let face = 0;
+                    }
+                }
+            }
+        }
+
+        // If a collision face is detected, destroy the brick
+        if (face > 0) {
+            do destroy();
+        }
+
+        return face;
+    }
+
+    // Accessor methods
+    method int getX() {
+        return x;
+    }
+    method int getY() {
+        return y;
+    }
+    method int getWidth() {
+        return width;
+    }
+    method int getHeight() {
+        return height;
+    }
+
+// Setter methods
+    method void setX(int val) {
+        if(~destroyed){
+            do eraseSelf();
+            let x = val;
+            do drawSelf();
+        }
+        return;
+    }
+
+    method void setY(int val) {
+        if(~destroyed){
+            do eraseSelf();
+            let y = val;
+            do drawSelf();
+        }
+        return;
+    }
+
+    method void setWidth(int val) {
+        let width = val;
+        return;
+    }
+
+    method void setHeight(int val) {
+        let height = val;
+        return;
+    }
+
+
+}
